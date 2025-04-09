@@ -27,6 +27,7 @@ export function Networks() {
     (s) => s.walletshieldListenAddress,
   );
 
+  const consoleAddLine = useStore((s) => s.consoleAddLine);
   const setClientPid = useStore((s) => s.setClientPid);
   const setIsConnected = useStore((s) => s.setIsConnected);
   const setMessage = useStore((s) => s.setMessage);
@@ -35,6 +36,7 @@ export function Networks() {
 
   async function connect() {
     try {
+      consoleAddLine(`Connecting to network: ${networkId}`);
       const pid = await clientStart();
       setClientPid(pid);
       setMessage("info", "");
@@ -44,16 +46,15 @@ export function Networks() {
     } catch (error: any) {
       log.error(`${error}`);
       setMessage("error", `${error}`);
+      consoleAddLine(`${error}`);
     }
   }
 
   async function disconnect() {
     try {
       await clientStop();
-      setClientPid(0);
       setMessage("info", "Disconnected from Network");
-      setIsConnected(false);
-      setNetworkConnected("");
+      consoleAddLine(`Disconnected from network: ${networkId}`);
     } catch (error: any) {
       log.error(`${error}`);
       setMessage("error", `${error}`);
@@ -156,21 +157,40 @@ export function Networks() {
         PATH: dirNetwork,
       },
     });
+    const o = (d: string) => `${d.trim()}`;
     log.debug(`spawning command: ${cmd} ${args.join(" ")}`);
+
     command.on("close", (data) => {
+      // normal: code=null signal=9
+      // error: code=2 signal=null
       log.debug(`closed: ${cmd} code=${data.code} signal=${data.signal}`);
-      setMessage("info", "Network client stopped.");
+      if (data.code !== null) {
+        setMessage("error", "Error: Network connection failed.");
+        consoleAddLine(`Network connection failed: ${networkId}`);
+      }
+      setClientPid(0);
+      setIsConnected(false);
+      setNetworkConnected("");
     });
-    command.on("error", (e) => log.error(`${cmd}: ${e.trim()}`));
-    command.stdout.on("data", (d) => log.info(`${cmd}: ${d.trim()}`));
-    command.stderr.on("data", (d) => log.error(`${cmd}: ${d.trim()}`));
+
+    command.on("error", (e) => log.error(o(e)));
+
+    command.stdout.on("data", (d) => {
+      log.info(o(d));
+      if (d.match(/client2/) === null) consoleAddLine(o(d));
+    });
+
+    command.stderr.on("data", (d) => {
+      log.error(o(d));
+      if (d.match(/client2/) === null) consoleAddLine(o(d));
+    });
 
     const child = await command.spawn();
     return child.pid;
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-5">
+    <div className="flex flex-col items-center justify-center gap-4">
       <img
         src="/zkn.svg"
         alt="ZKN"
