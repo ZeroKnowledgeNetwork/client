@@ -1,5 +1,8 @@
 use tauri::Manager;
 
+mod config;
+mod ws_server;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn network_connect(network_id: &str) -> String {
@@ -63,7 +66,23 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![network_connect])
+        .manage(ws_server::ConnMap::default())
+        .setup(|app| {
+            // load config from tauri.conf.json:plugins.zknet
+            // the plugins section is used for its schema flexibility
+            let cfg = config::plugin_cfg::<_, config::ZKNetClientCfg>(&app.handle(), "zknet");
+            app.manage(cfg);
+
+            // start a WebSocket server for local API requests
+            let addr = &app.state::<config::ZKNetClientCfg>().api_listen_address;
+            ws_server::start(&app.handle(), addr);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            network_connect,
+            config::cfg,
+            ws_server::api_reply,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

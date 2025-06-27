@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../store";
-import { defaultWalletshieldListenAddress } from "../utils";
+import { getZKNetClientCfg } from "../utils";
+import { notifyAPIClientsOfStatusChange } from "../services/api";
 
 export function Settings() {
   const [listenAddress, setListenAddress] = useState("");
+  const [
+    defaultWalletshieldListenAddress,
+    setDefaultWalletshieldListenAddress,
+  ] = useState("");
 
   const walletshieldListenAddress = useStore(
     (s) => s.walletshieldListenAddress,
@@ -16,16 +21,22 @@ export function Settings() {
 
   useEffect(() => {
     setListenAddress(walletshieldListenAddress);
+    (async () => {
+      const cfg = await getZKNetClientCfg();
+      setDefaultWalletshieldListenAddress(cfg.defaultWalletshieldListenAddress);
+    })();
   }, []);
 
   const handleReset = () => {
     setListenAddress("");
     setWalletshieldListenAddress("");
+    notifyAPIClientsOfStatusChange();
     setMessage("success", "Settings reset to default.");
   };
 
   const handleApply = () => {
     setWalletshieldListenAddress(listenAddress);
+    notifyAPIClientsOfStatusChange();
     setMessage("success", "Settings saved.");
   };
 

@@ -7,10 +7,11 @@ import { platform } from "@tauri-apps/plugin-os";
 import { Child, Command } from "@tauri-apps/plugin-shell";
 import { download } from "@tauri-apps/plugin-upload";
 import { useStore } from "../store";
+import { notifyAPIClientsOfStatusChange } from "../services/api";
 import {
-  defaultWalletshieldListenAddress,
   getNetworks,
-  urlNetwork,
+  getWalletshieldListenAddress,
+  getZKNetClientCfg,
 } from "../utils";
 
 export function Networks() {
@@ -23,9 +24,6 @@ export function Networks() {
   const networkConnected = useStore((s) => s.networkConnected);
   const networks = useStore((s) => s.networks);
   const platformArch = useStore((s) => s.platformArch);
-  const walletshieldListenAddress = useStore(
-    (s) => s.walletshieldListenAddress,
-  );
 
   const consoleAddLine = useStore((s) => s.consoleAddLine);
   const setClientPid = useStore((s) => s.setClientPid);
@@ -44,6 +42,7 @@ export function Networks() {
       setIsConnected(true);
       setNetworkConnected(networkId);
       setNetworks(await getNetworks());
+      notifyAPIClientsOfStatusChange();
     } catch (error: any) {
       log.error(`${error}`);
       setMessage("error", `${error}`);
@@ -70,6 +69,8 @@ export function Networks() {
   }
 
   async function clientStart() {
+    const { urlNetwork } = await getZKNetClientCfg();
+
     const urlClientCfg = `${urlNetwork}/${networkId}/client.toml`;
     const urlServices = `${urlNetwork}/${networkId}/services.json`;
     const urlWalletshield = `${urlNetwork}/${networkId}/walletshield-${platformArch}`;
@@ -153,7 +154,7 @@ export function Networks() {
     ////////////////////////////////////////////////////////////////////////
     setMessage("info", "Starting network client...");
     const cmd = "walletshield";
-    const wla = walletshieldListenAddress || defaultWalletshieldListenAddress;
+    const wla = await getWalletshieldListenAddress();
     const args = ["-listen", wla, "-config", "client.toml"];
     const command = Command.create("walletshield-listen", args, {
       cwd: dirNetwork,
@@ -176,6 +177,7 @@ export function Networks() {
       setIsConnected(false);
       setIsStopping(false);
       setNetworkConnected("");
+      notifyAPIClientsOfStatusChange();
     });
 
     command.on("error", (e) => log.error(o(e)));

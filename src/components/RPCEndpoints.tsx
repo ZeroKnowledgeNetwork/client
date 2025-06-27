@@ -3,8 +3,8 @@ import { useStore } from "../store";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import * as log from "@tauri-apps/plugin-log";
 import {
-  defaultWalletshieldListenAddress,
   NetworkServices,
+  getWalletshieldListenAddress,
   readNetworkAssetFile,
 } from "../utils";
 import { IconClipboard } from "./icons";
@@ -14,19 +14,18 @@ export function RPCEndpoints() {
   const [search, setSearch] = useState("");
   const [services, setServices] = useState<NetworkServices | null>();
   const [copied, setCopied] = useState("");
+  const [walletshieldListenAddr, setWalletshieldListenAddr] = useState("");
 
   const networkConnected = useStore((s) => s.networkConnected);
   const setMessage = useStore((s) => s.setMessage);
 
-  const walletshieldListenAddress = useStore(
-    (s) => s.walletshieldListenAddress,
-  );
-  const wla = walletshieldListenAddress || defaultWalletshieldListenAddress;
-  const BASE_URL = `http://localhost${wla}`;
+  const BASE_URL = `http://localhost${walletshieldListenAddr}`;
 
   useEffect(() => {
     try {
       (async () => {
+        setWalletshieldListenAddr(await getWalletshieldListenAddress());
+
         // read services file of the connected network
         if (networkConnected) {
           const f = await readNetworkAssetFile(
